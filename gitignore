@@ -75,3 +75,4 @@ coverage/
 *.pid
 *.seed
 *.lock
+actions-runner/
