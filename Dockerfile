@@ -1,3 +1,5 @@
+From nginx:alphine3.23
+COPY . /usr/share/nginx/html
 # Use official Nginx image as base (for serving static content)
 FROM nginx:alpine
 
