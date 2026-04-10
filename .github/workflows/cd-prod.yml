@@ -57,3 +57,4 @@ jobs:
           subject: "Rapport Déploiement Intranet : ${{ job.status }}"
           body: "Le déploiement de l'Intranet New Deal est terminé avec le statut : ${{ job.status }}."
           to: moussawade@groupeisi.com
+          from: "GitHub Actions - Intranet NewDeal"
