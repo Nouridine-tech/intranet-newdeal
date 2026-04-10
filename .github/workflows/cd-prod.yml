@@ -3,7 +3,7 @@ name: CD Pipeline Prod
 on:
   push:
     branches:
-      - prod  # Déclenchement uniquement sur la branche prod
+      - prod  # Déclenchement sur la branche prod
 
 env:
   IMAGE_NAME: intranet-newdeal
@@ -11,7 +11,7 @@ env:
 
 jobs:
   # ==========================================
-  # JOB 1 - SCAN : Vérification avant déploiement
+  # JOB 1 - SCAN : Sécurité avant déploiement
   # ==========================================
   security_scan:
     runs-on: ubuntu-latest
@@ -24,7 +24,7 @@ jobs:
           severity: 'CRITICAL'
 
   # ==========================================
-  # JOB 2 - DEPLOY : Déploiement sur runner local
+  # JOB 2 - DEPLOY : Déploiement sur runner Windows
   # ==========================================
   deploy:
     needs: security_scan
@@ -41,9 +41,12 @@ jobs:
           # Téléchargement de l'image
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           
-          # Nettoyage de l'ancien conteneur
-          docker stop intranet-prod || true
-          docker rm intranet-prod || true
+          # Nettoyage de l'ancien conteneur (Syntaxe compatible PowerShell/Windows)
+          $container = docker ps -a -q --filter "name=intranet-prod"
+          if ($container) {
+              docker stop intranet-prod
+              docker rm intranet-prod
+          }
           
           # Lancement sur le port 80 (Demande Etape 4)
           docker run -d --name intranet-prod -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
@@ -66,4 +69,4 @@ jobs:
           subject: "Rapport Déploiement Intranet : ${{ job.status }}"
           body: "Le déploiement de l'Intranet New Deal est terminé avec le statut : ${{ job.status }}."
           to: moussawade@groupeisi.com
-          from: "GitHub Actions - Intranet"
+          from: "GitHub Actions - Ministère Communication"
