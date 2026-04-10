@@ -57,7 +57,7 @@ jobs:
   notify:
     needs: deploy
     runs-on: ubuntu-latest
-    if: always() # S'exécute même si le déploiement échoue
+    if: always()
     steps:
       - name: Send Deployment Status Email
         uses: dawidd6/action-send-mail@v3
