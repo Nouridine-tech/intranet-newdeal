@@ -25,7 +25,7 @@ jobs:
   # Job 2 : Déploiement sur runner_prod
   deploy:
     needs: security_scan
-    runs-on: runner_prod # Runner spécifié dans l'énoncé
+    runs-on: self-hosted # Runner spécifié dans l'énoncé
     steps:
       - name: Login to Docker Hub
         run: |
