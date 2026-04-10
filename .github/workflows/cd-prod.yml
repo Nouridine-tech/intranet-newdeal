@@ -1,0 +1,59 @@
+name: CD Pipeline Prod
+
+on:
+  push:
+    branches:
+      - prod  # Déclenchement uniquement sur la branche prod
+
+env:
+  IMAGE_NAME: intranet-newdeal
+  DOCKER_REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  # Job 1 : Scan de sécurité
+  # On scanne l'image pour vérifier l'absence de vulnérabilités CRITICAL avant déploiement
+  security_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan Image for Vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest'
+          exit-code: '1' # Bloque si vulnérabilité critique trouvée
+          severity: 'CRITICAL'
+
+  # Job 2 : Déploiement sur runner_prod
+  deploy:
+    needs: security_scan
+    runs-on: runner_prod # Runner spécifié dans l'énoncé
+    steps:
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Pull and Run on Port 80
+        run: |
+          # On récupère l'image validée
+          docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          # On nettoie l'ancien conteneur s'il existe
+          docker stop intranet-prod || true
+          docker rm intranet-prod || true
+          # On expose sur le port 80 comme demandé
+          docker run -d --name intranet-prod -p 80:80 ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+  # Évolution : Notification Email
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Deployment Status Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ://gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USER }}
+          password: ${{ secrets.MAIL_PASS }}
+          subject: "Rapport Déploiement Intranet : ${{ job.status }}"
+          body: "Le déploiement de l'Intranet New Deal est terminé avec le statut : ${{ job.status }}."
+          to: moussawade@groupeisi.com
