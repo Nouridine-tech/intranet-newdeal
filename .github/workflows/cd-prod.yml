@@ -10,42 +10,51 @@ env:
   DOCKER_REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
-  # Job 1 : Scan de sécurité
-  # On scanne l'image pour vérifier l'absence de vulnérabilités CRITICAL avant déploiement
+  # ==========================================
+  # JOB 1 - SCAN : Vérification avant déploiement
+  # ==========================================
   security_scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Scan Image for Vulnerabilities
+      - name: Scan Image for Vulnerabilities (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest'
-          exit-code: '1' # Bloque si vulnérabilité critique trouvée
+          exit-code: '1' # Bloque si vulnérabilité CRITICAL
           severity: 'CRITICAL'
 
-  # Job 2 : Déploiement sur runner_prod
+  # ==========================================
+  # JOB 2 - DEPLOY : Déploiement sur runner local
+  # ==========================================
   deploy:
     needs: security_scan
-    runs-on: self-hosted # Runner spécifié dans l'énoncé
+    runs-on: self-hosted
     steps:
       - name: Login to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Pull and Run on Port 80
         run: |
-          # On récupère l'image validée
-          docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          # On nettoie l'ancien conteneur s'il existe
+          # Téléchargement de l'image
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          
+          # Nettoyage de l'ancien conteneur
           docker stop intranet-prod || true
           docker rm intranet-prod || true
-          # On expose sur le port 80 comme demandé
-          docker run -d --name intranet-prod -p 80:80 ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          
+          # Lancement sur le port 80 (Demande Etape 4)
+          docker run -d --name intranet-prod -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
-  # Évolution : Notification Email
+  # ==========================================
+  # JOB 3 - NOTIFY : Notification Email (Etape 5)
+  # ==========================================
   notify:
     needs: deploy
     runs-on: ubuntu-latest
-    if: always()
+    if: always() # S'exécute même si le déploiement échoue
     steps:
       - name: Send Deployment Status Email
         uses: dawidd6/action-send-mail@v3
@@ -57,4 +66,4 @@ jobs:
           subject: "Rapport Déploiement Intranet : ${{ job.status }}"
           body: "Le déploiement de l'Intranet New Deal est terminé avec le statut : ${{ job.status }}."
           to: moussawade@groupeisi.com
-          from: "GitHub Actions - Intranet NewDeal"
+          from: "GitHub Actions - Intranet"
